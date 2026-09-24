@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Orthobitto - OCR & Bengali Translation Web Application" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#F4F1EA" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0B0C0E" media="(prefers-color-scheme: dark)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Orthobitto" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Orthobitto — English Learning Intelligence</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+<link rel="icon" href="favicon.ico?v=4.0.8" type="image/x-icon" />
+  <link rel="icon" href="icon-32.png?v=4.0.8" type="image/png" sizes="32x32" />
+  <link rel="icon" href="icon-16.png?v=4.0.8" type="image/png" sizes="16x16" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4.0.8" sizes="180x180" />
+
+  <!-- Prevent theme flash: apply saved theme immediately, otherwise follow OS/browser preference. -->
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem('orthobitto-theme-preference-v2') || 'system';
+        const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolved = saved === 'system' ? (isDark ? 'dark' : 'light') : saved;
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.dataset.themePreference = saved;
+      } catch (_) {}
+    })();
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tesseract.js CDN -->
+  
+  
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="app.css?v=4.0.8" />
+</head>
+<body>
+
+  <!-- ========== TOAST NOTIFICATION CONTAINER ========== -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- ========== BLUR WARNING MODAL ========== -->
+  <div id="blur-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="blur-modal-title" hidden>
+    <div class="modal-card glass-card">
+      <div class="modal-icon-wrap">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="28" cy="28" r="28" fill="url(#blurGrad)" opacity="0.15"/>
+          <path d="M28 16L28 30" stroke="#F59E0B" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="28" cy="36" r="2" fill="#F59E0B"/>
+          <defs>
+            <radialGradient id="blurGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#F59E0B"/>
+              <stop offset="100%" stop-color="#EF4444"/>
+            </radialGradient>
+          </defs>
+        </svg>
+      </div>
+      <h3 id="blur-modal-title" class="modal-title">Blurry Image Detected</h3>
+      <p class="modal-body">The uploaded image appears to be too blurry for accurate text extraction. Please retake or upload a clearer photo for better OCR results.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeBlurModal()">Dismiss</button>
+        <button class="btn btn-primary" onclick="closeBlurModal(); triggerFileInput()">Try Again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== HISTORY DRAWER ========== -->
+  <div id="history-drawer" class="drawer-overlay" hidden>
+    <div class="drawer glass-card">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="12 8 12 12 14 14"></polyline>
+            <path d="M3.05 11a9 9 0 1 0 .5-4"></path>
+            <polyline points="3 3 3 7 7 7"></polyline>
+          </svg>
+          <h3>Scan History</h3>
+        </div>
+        <button class="icon-btn" onclick="closeHistoryDrawer()" aria-label="Close history">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="drawer-actions">
+        <button class="btn btn-sm btn-danger" onclick="clearAllHistory()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+          Clear All
+        </button>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="empty-state-sm">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          <p>No history yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MAIN APP WRAPPER ========== -->
+  <div class="app-wrapper">
+
+    <!-- ========== HEADER ========== -->
+    <header class="app-header glass-header">
+      <div class="header-inner">
+        <!-- Logo -->
+        <a href="#" class="logo-wrap" aria-label="Orthobitto Home">
+          <div class="logo-icon">
+            <img src="icon-48.png" srcset="icon-96.png 2x" width="40" height="40" alt="Orthobitto icon" decoding="async" />
+          </div>
+          <div class="logo-text">
+            <span class="logo-name">Orthobitto</span>
+            <span class="logo-tagline">English Learning Intelligence</span>
+          </div>
+        </a>
+
+        <!-- Header Controls -->
+        <div class="header-controls">
+          <!-- Online Status Indicator -->
+          <div id="online-indicator" class="status-pill online" title="Online">
+            <span class="status-dot"></span>
+            <span class="status-label">Online</span>
+          </div>
+
+          <!-- History Button -->
+          <button class="icon-btn icon-btn-header" onclick="openHistoryDrawer()" aria-label="Scan History" title="Scan History">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="12 8 12 12 14 14"></polyline>
+              <path d="M3.05 11a9 9 0 1 0 .5-4"></path>
+              <polyline points="3 3 3 7 7 7"></polyline>
+            </svg>
+          </button>
+          <!-- Compact Theme Preference -->
+          <div class="theme-control" id="theme-control" role="group" aria-label="Appearance">
+            <button class="theme-icon-btn" type="button" data-theme-option="system" aria-label="Use system appearance" aria-pressed="false" title="System">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4Z"/><path d="M5.2 6.2 3.7 4.7M18.8 6.2l1.5-1.5M3.5 12H1.5M22.5 12h-2M5.2 17.8l-1.5 1.5M18.8 17.8l1.5 1.5M12 20.5v2M12 1.5v2"/><path d="M9.2 12.2 10.8 14l4-4"/></svg>
+            </button>
+            <button class="theme-icon-btn" type="button" data-theme-option="light" aria-label="Use light appearance" aria-pressed="false" title="Light">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.4 1.4M17.67 17.67l1.4 1.4M2 12h2M20 12h2M4.93 19.07l1.4-1.4M17.67 6.33l1.4-1.4"/></svg>
+            </button>
+            <button class="theme-icon-btn" type="button" data-theme-option="dark" aria-label="Use dark appearance" aria-pressed="false" title="Dark">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.3A8.5 8.5 0 0 1 9.7 3.8 8.5 8.5 0 1 0 20.2 14.3Z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="app-main" id="app-main">
+
+      <!-- ===== DESKTOP SPLIT LAYOUT ===== -->
+      <div class="split-layout">
+
+        <!-- ===== LEFT PANEL: Scanner + OCR ===== -->
+        <section class="panel panel-left" id="panel-scanner">
+
+          <!-- Scanner Card -->
+          <div class="card scanner-card" id="scanner-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                <h2 class="card-title">Scanner</h2>
+              </div>
+              <div class="card-actions-row">
+                <button class="btn btn-sm btn-ghost" id="torch-btn" onclick="toggleTorch()" title="Toggle Flashlight" hidden>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                  Torch
+                </button>
+                <button class="btn btn-sm btn-ghost" id="camera-switch-btn" onclick="switchCamera()" title="Switch Camera" hidden>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+                </button>
+                <button class="btn btn-sm btn-outline" id="camera-btn" onclick="startCamera()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  Camera
+                </button>
+              </div>
+            </div>
+
+            <!-- Dropzone -->
+            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload image for OCR. Drag and drop or click to browse." onclick="triggerFileInput()" onkeydown="if(event.key==='Enter'||event.key===' ')triggerFileInput()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+              <input type="file" id="file-input" accept="image/*" onchange="handleFileSelect(event)" hidden />
+
+              <!-- Default Upload State -->
+              <div class="dropzone-content" id="dropzone-content">
+                <div class="upload-icon-wrap">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="48" height="48" rx="14" fill="url(#uploadGrad)" opacity="0.1"/>
+                    <path d="M24 16V32" stroke="url(#uploadGrad2)" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M17 23L24 16L31 23" stroke="url(#uploadGrad2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 34H36" stroke="url(#uploadGrad2)" stroke-width="2.5" stroke-linecap="round"/>
+                    <defs>
+                      <linearGradient id="uploadGrad" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#8B7352"/><stop offset="1" stop-color="#B89A63"/></linearGradient>
+                      <linearGradient id="uploadGrad2" x1="12" y1="16" x2="36" y2="34"><stop stop-color="#8B7352"/><stop offset="1" stop-color="#B89A63"/></linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <p class="dropzone-title">Drop image here or click to upload</p>
+                <p class="dropzone-subtitle">Supports JPG, PNG, WEBP, HEIC · Max 20MB</p>
+                <div class="dropzone-features">
+                  <span class="feature-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Auto Contrast</span>
+                  <span class="feature-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Blur Detection</span>
+                  <span class="feature-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>OCR Engine</span>
+                </div>
+              </div>
+
+              <!-- Image Preview State (hidden by default) -->
+              <div class="image-preview-wrap" id="image-preview-wrap" hidden>
+                <img id="preview-img" class="preview-img" alt="Scanned document preview" />
+                <!-- Scanning Wave Animation -->
+                <div class="scan-wave-container" id="scan-wave-container" hidden>
+                  <div class="scan-wave-line"></div>
+                  <div class="scan-corners">
+                    <span class="corner tl"></span>
+                    <span class="corner tr"></span>
+                    <span class="corner bl"></span>
+                    <span class="corner br"></span>
+                  </div>
+                  <div class="scan-glow-overlay"></div>
+                </div>
+                <button class="remove-image-btn" id="remove-image-btn" onclick="removeImage(event)" aria-label="Remove image">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+
+              <!-- Camera Stream State (hidden by default) -->
+              <div class="camera-wrap" id="camera-wrap" hidden>
+                <video id="camera-video" class="camera-video" autoplay playsinline muted></video>
+                <div class="camera-ui">
+                  <div class="camera-corners">
+                    <span class="corner tl"></span><span class="corner tr"></span>
+                    <span class="corner bl"></span><span class="corner br"></span>
+                  </div>
+                </div>
+                <div class="camera-controls">
+                  <button class="capture-btn" onclick="capturePhoto()" aria-label="Capture photo">
+                    <span class="capture-ring"></span>
+                    <span class="capture-inner"></span>
+                  </button>
+                  <button class="btn btn-sm btn-ghost stop-camera-btn" onclick="stopCamera()">Stop Camera</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Image Adjustment Controls (visible after image upload) -->
+            <div class="image-controls" id="image-controls" hidden>
+              <div class="controls-grid">
+                <div class="control-item">
+                  <label class="control-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M1 12h3M20 12h3M12 1v3M12 20v3"/></svg>
+                    Brightness
+                  </label>
+                  <div class="slider-row">
+                    <input type="range" id="brightness-slider" class="control-slider" min="-100" max="100" value="20" oninput="applyFilters()" />
+                    <span class="slider-val" id="brightness-val">20</span>
+                  </div>
+                </div>
+                <div class="control-item">
+                  <label class="control-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/></svg>
+                    Contrast
+                  </label>
+                  <div class="slider-row">
+                    <input type="range" id="contrast-slider" class="control-slider" min="-100" max="100" value="30" oninput="applyFilters()" />
+                    <span class="slider-val" id="contrast-val">30</span>
+                  </div>
+                </div>
+                <div class="control-item">
+                  <label class="control-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+                    Rotation
+                  </label>
+                  <div class="rotation-btns">
+                    <button class="btn btn-xs btn-ghost" onclick="rotateImage(-90)" title="Rotate Left">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                      Left
+                    </button>
+                    <button class="btn btn-xs btn-ghost" onclick="rotateImage(90)" title="Rotate Right">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                      Right
+                    </button>
+                    <button class="btn btn-xs btn-outline" onclick="openPerspectiveCrop()" title="Adjust document corners">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+                      Corners
+                    </button>
+                    <button class="btn btn-xs btn-ghost" onclick="resetFilters()" title="Reset">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 .5-3M3 3v6h6"/></svg>
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scan Button -->
+            <div class="scan-action-row" id="scan-action-row" hidden>
+              <button class="btn btn-primary btn-scan" id="scan-btn" onclick="startOCR()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                  <line x1="9" y1="20" x2="15" y2="20"></line>
+                  <line x1="12" y1="4" x2="12" y2="20"></line>
+                </svg>
+                Scan &amp; Extract Text
+              </button>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="progress-steps" id="progress-steps" hidden>
+              <div class="progress-header">
+                <span class="progress-label" id="progress-label">Initializing...</span>
+                <span class="progress-pct" id="progress-pct">0%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="progress-bar-fill"></div>
+              </div>
+              <div class="step-indicators">
+                <div class="step-item" id="step-scan" data-step="scan">
+                  <div class="step-dot">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <span>Scanning</span>
+                </div>
+                <div class="step-item" id="step-filter" data-step="filter">
+                  <div class="step-dot">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <span>Filtering</span>
+                </div>
+                <div class="step-item" id="step-translate" data-step="translate">
+                  <div class="step-dot">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <span>Translating</span>
+                </div>
+                <div class="step-item" id="step-vocab" data-step="vocab">
+                  <div class="step-dot">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <span>Vocabulary</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- OCR Text Editor Card -->
+          <div class="card ocr-card" id="ocr-card" hidden>
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <h2 class="card-title">Extracted Text</h2>
+              </div>
+              <div class="card-actions-row">
+                <button class="btn btn-sm btn-ghost" onclick="copyOcrText()" title="Copy text">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  Copy
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="startTranslation()" id="translate-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+                  Translate
+                </button>
+              </div>
+            </div>
+            <div class="ocr-editor-wrap">
+              <textarea id="ocr-text-editor" class="ocr-editor" placeholder="Extracted text will appear here. You can edit before translating..." rows="8" spellcheck="true" aria-label="Extracted OCR text editor"></textarea>
+              <div class="editor-footer">
+                <span class="char-count" id="char-count">0 characters</span>
+                <span class="word-count" id="word-count">0 words</span>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ===== RIGHT PANEL: Translation + Vocabulary ===== -->
+        <section class="panel panel-right" id="panel-results">
+
+          <!-- Empty State for Right Panel -->
+          <div class="empty-state-right" id="empty-state-right">
+            <div class="empty-state-visual">
+              <div class="empty-orb"></div>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" class="empty-icon">
+                <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/>
+              </svg>
+            </div>
+            <h3 class="empty-title">Ready to Translate</h3>
+            <p class="empty-desc">Upload an image or take a photo, scan to extract text, then hit Translate to see Bengali translations and vocabulary.</p>
+            <div class="empty-steps">
+              <div class="empty-step"><span class="step-num">1</span><span>Upload Image</span></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="step-arrow"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              <div class="empty-step"><span class="step-num">2</span><span>Scan &amp; Extract</span></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="step-arrow"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              <div class="empty-step"><span class="step-num">3</span><span>Translate</span></div>
+            </div>
+          </div>
+
+          <!-- Translation Card -->
+          <div class="card translation-card" id="translation-card" hidden>
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+                <h2 class="card-title">Translation</h2>
+                <span class="lang-badge">EN → বাং</span>
+              </div>
+              <div class="card-actions-row">
+                <button class="btn btn-sm btn-ghost" onclick="copyTranslation()" title="Copy translation">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  Copy
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="openPDFSettings('sentences')" title="Export Sentences PDF">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  Sentence PDF
+                </button>
+              </div>
+            </div>
+            <div class="translation-body" id="translation-body">
+              <!-- Translation sentences rendered here by JS -->
+            </div>
+          </div>
+
+          <!-- Vocabulary Card -->
+          <div class="card vocab-card" id="vocab-card" hidden>
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <h2 class="card-title">Vocabulary</h2>
+                <span class="vocab-count-badge" id="vocab-count-badge">0 words</span>
+              </div>
+              <div class="card-actions-row">
+                <button class="btn btn-sm btn-ghost" onclick="openPDFSettings('vocab')" title="Export Vocabulary PDF">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line>
+                  </svg>
+                  PDF
+                </button>
+              </div>
+            </div>
+            <div class="vocab-table-wrap" id="vocab-table-wrap">
+              <table class="vocab-table" id="vocab-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>English Word</th>
+                    <th>Bengali Meaning</th>
+                    <th>Pronunciation</th>
+                  </tr>
+                </thead>
+                <tbody id="vocab-tbody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+      </div>
+
+    </main>
+
+    <!-- ========== MOBILE BOTTOM NAV ========== -->
+    <nav class="mobile-bottom-nav" id="mobile-nav" aria-label="Mobile Navigation">
+      <button class="nav-tab active" data-tab="scanner" onclick="switchMobileTab('scanner', this)" aria-label="Home and Scanner">
+        <div class="nav-tab-icon">⌂</div><span class="nav-tab-label">Home</span>
+      </button>
+      <button class="nav-tab nav-tab-primary" data-tab="scanner" onclick="switchMobileTab('scanner', this); document.getElementById('dropzone')?.scrollIntoView({behavior:'smooth',block:'center'})" aria-label="Scan">
+        <div class="nav-tab-icon">＋</div><span class="nav-tab-label">Scan</span>
+      </button>
+      <button class="nav-tab" data-tab="sentences" onclick="switchMobileTab('sentences', this)" aria-label="Sentence Results">
+        <div class="nav-tab-icon">A</div><span class="nav-tab-label">Sentences</span><span class="nav-tab-badge" id="nav-sentence-badge" hidden></span>
+      </button>
+      <button class="nav-tab" data-tab="vocabulary" onclick="switchMobileTab('vocabulary', this)" aria-label="Word Results">
+        <div class="nav-tab-icon">Aa</div><span class="nav-tab-label">Words</span><span class="nav-tab-badge" id="nav-vocab-badge" hidden></span>
+      </button>
+      <button class="nav-tab" data-tab="more" onclick="openAuxHub('more', this)" aria-label="More">
+        <div class="nav-tab-icon">⋯</div><span class="nav-tab-label">More</span>
+      </button>
+    </nav>
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="app-footer">
+      <p>Developed with <svg width="14" height="14" viewBox="0 0 24 24" fill="#EF4444" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg> by <a href="https://www.facebook.com/OmarMohammadChowdhury" target="_blank" rel="noopener noreferrer" class="footer-link">Omar Mohammad Chowdhury</a></p>
+    </footer>
+
+  </div><!-- end .app-wrapper -->
+
+  <!-- ========== WORD CARD ========== -->
+  <div id="word-card-overlay" class="word-card-overlay" hidden>
+    <aside id="word-card" class="word-card" role="dialog" aria-modal="true" aria-labelledby="word-card-title">
+      <div class="word-card-handle" aria-hidden="true"></div>
+      <div class="word-card-head">
+        <div>
+          <span class="word-card-kicker">WORD</span>
+          <h2 id="word-card-title" class="word-card-title">Word</h2>
+          <div id="word-card-pronunciation" class="word-card-pronunciation"></div>
+        </div>
+        <button class="icon-btn" onclick="closeWordCard()" aria-label="Close word card">×</button>
+      </div>
+      <div id="word-card-pos" class="word-card-pos">Word</div>
+      <div class="word-card-section">
+        <div class="word-card-label">বাংলা অর্থ</div>
+        <div id="word-card-meaning" class="word-card-meaning">—</div>
+      </div>
+      <div id="word-card-context-wrap" class="word-card-section" hidden>
+        <div class="word-card-label">এই বাক্যে</div>
+        <div id="word-card-context" class="word-card-context"></div>
+      </div>
+      <div id="word-card-example-wrap" class="word-card-section" hidden>
+        <div class="word-card-label">Example</div>
+        <div id="word-card-example" class="word-card-example"></div>
+      </div>
+      <div class="word-card-grid">
+        <div><div class="word-card-label">Synonyms</div><div id="word-card-synonyms" class="word-card-list">—</div></div>
+        <div><div class="word-card-label">Antonyms</div><div id="word-card-antonyms" class="word-card-list">—</div></div>
+      </div>
+      <div class="word-card-meta" id="word-card-meta"></div>
+      <div class="word-card-actions">
+        <button class="btn btn-outline" id="word-card-listen" type="button">Listen</button>
+        <button class="btn btn-outline" id="word-card-save" type="button">Save</button>
+        <button class="btn btn-primary" id="word-card-practice" type="button">Practice</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ========== LEARNING / SAVED HUB ========== -->
+  <div id="aux-overlay" class="aux-overlay" hidden>
+    <section class="aux-sheet" role="dialog" aria-modal="true" aria-labelledby="aux-title">
+      <div class="aux-sheet-header">
+        <div><span class="aux-kicker">ORTHOBITTO</span><h2 id="aux-title">Learn</h2></div>
+        <button class="icon-btn" onclick="closeAuxHub()" aria-label="Close">×</button>
+      </div>
+      <div id="aux-content" class="aux-content"></div>
+    </section>
+  </div>
+
+  <!-- ========== PERSPECTIVE CROP ========== -->
+  <div id="crop-overlay" class="crop-overlay" hidden>
+    <section class="crop-sheet" role="dialog" aria-modal="true" aria-labelledby="crop-title">
+      <div class="crop-header"><div><span class="aux-kicker">DOCUMENT MODE</span><h2 id="crop-title">Adjust corners</h2></div><button id="crop-close-btn" class="icon-btn" type="button" onclick="closePerspectiveCrop()" aria-label="Close crop editor">×</button></div>
+      <div id="crop-stage" class="crop-stage">
+        <img id="crop-image" alt="Document crop preview" />
+        <div id="crop-polygon" class="crop-polygon" aria-hidden="true"></div>
+        <button class="crop-handle crop-tl" data-corner="tl" aria-label="Top left corner"></button>
+        <button class="crop-handle crop-tr" data-corner="tr" aria-label="Top right corner"></button>
+        <button class="crop-handle crop-br" data-corner="br" aria-label="Bottom right corner"></button>
+        <button class="crop-handle crop-bl" data-corner="bl" aria-label="Bottom left corner"></button>
+      </div>
+      <div class="crop-footer"><span>Drag each corner to the page edge.</span><div class="modal-actions"><button id="crop-cancel-btn" class="btn btn-outline" type="button" onclick="closePerspectiveCrop()">Cancel</button><button class="btn btn-primary" onclick="applyPerspectiveCrop()">Use crop</button></div></div>
+    </section>
+  </div>
+
+  <!-- ========== PDF SETTINGS MODAL ========== -->
+  <div id="pdf-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title" hidden>
+    <div class="modal-card glass-card pdf-modal-card">
+      <div class="modal-header-row">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          <h3 id="pdf-modal-title" class="modal-title">Export PDF</h3>
+        </div>
+        <button class="icon-btn" onclick="closePDFModal()" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="pdf-export-mode-note" id="pdf-export-mode-note">Your document will be exported as a clean A4 PDF.</div>
+      <div class="pdf-settings-grid">
+        <div class="pdf-setting-item">
+          <label class="setting-label">English Font</label>
+          <select class="setting-select" id="pdf-eng-font">
+            <optgroup label="Handwriting">
+              <option value="Caveat">Caveat</option>
+              <option value="Indie Flower">Indie Flower</option>
+            </optgroup>
+            <optgroup label="Computer">
+              <option value="Inter">Inter</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="pdf-setting-item">
+          <label class="setting-label">Bengali Font</label>
+          <select class="setting-select" id="pdf-ben-font">
+            <optgroup label="Handwriting / Display">
+              <option value="Atma">Atma</option>
+              <option value="Mina">Mina</option>
+              <option value="Galada">Galada</option>
+            </optgroup>
+            <optgroup label="Computer / Clean">
+              <option value="Noto Sans Bengali">Noto Sans Bengali</option>
+              <option value="Hind Siliguri">Hind Siliguri</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="pdf-setting-item">
+          <label class="setting-label">English Font Size</label>
+          <div class="size-control">
+            <button class="size-btn" onclick="adjustFontSize('eng', -1)">−</button>
+            <span class="size-display" id="eng-font-size">18</span>
+            <button class="size-btn" onclick="adjustFontSize('eng', 1)">+</button>
+          </div>
+        </div>
+        <div class="pdf-setting-item">
+          <label class="setting-label">Bengali Font Size</label>
+          <div class="size-control">
+            <button class="size-btn" onclick="adjustFontSize('ben', -1)">−</button>
+            <span class="size-display" id="ben-font-size">17</span>
+            <button class="size-btn" onclick="adjustFontSize('ben', 1)">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="pdf-preview-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span>Pure white paper, crisp black text, selectable English and Bengali handwriting or computer fonts, and a protected footer zone so the content never touches the footer.</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closePDFModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="generatePDF()" id="pdf-generate-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
+          Download PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Canvas for image processing -->
+  <canvas id="processing-canvas" hidden aria-hidden="true"></canvas>
+
+  <!-- Scripts -->
+  <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@6/dist/tesseract.min.js"></script>
+  <script defer src="content-safety.js?v=4.0.8"></script>
+  <script defer src="word-classes.js?v=4.0.8"></script>
+  <script defer src="dictionary-engine.js?v=4.0.8"></script>
+  <script defer src="app.js?v=4.0.8"></script>
+  <script defer src="orthobitto-enhancements.js?v=4.0.8"></script>
+</body>
+</html>

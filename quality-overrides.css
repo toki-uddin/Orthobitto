@@ -1,0 +1,3 @@
+/* Orthobitto visual quality overrides */
+:root{--pdf-safe-footer-space:96px;}
+.vocab-bengali,.sentence-bengali,.sentence-ben-text{font-family:'Hind Siliguri',sans-serif;font-weight:500;}

@@ -1,0 +1,29 @@
+{
+  "project": "Orthobitto",
+  "version": "4.1.2",
+  "release": "github-pdf-fix",
+  "theme": [
+    "system",
+    "light",
+    "dark"
+  ],
+  "dictionaryMode": "approved-local-first",
+  "androidRelease": false,
+  "futureDictionaryMergeReady": true,
+  "primaryRuntime": [
+    "HTML5",
+    "CSS3",
+    "JavaScript"
+  ],
+  "dataTooling": [
+    "Python"
+  ],
+  "nativeCxx": "diagnostic-only-until-benchmark-proves-benefit",
+  "releaseFilesFlat": true,
+  "qa": "validate_release.py",
+  "pdfExport": {
+    "engine": "pdf-generator.js",
+    "pagination": "height-aware-greedy",
+    "facebookLink": true
+  }
+}
